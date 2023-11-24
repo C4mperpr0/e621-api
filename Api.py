@@ -41,20 +41,29 @@ class Api:
             print(f"[{response.status_code}] \"{response.url}\"")
             return json.loads(response.content) if is_json else response.content
 
-    def get_posts(self, fetch_all: bool = False, page: int = 1, limit: int = 250, query: str = ""):
+    def get_posts(self,
+                  fetch_all: bool = False,
+                  page: int = 1,
+                  limit: int = 250,
+                  query: str = "",
+                  base_url: str = "https://e621.net/posts.json"):
         if fetch_all:
             posts = []
             last_amount = -1
             while len(posts) != last_amount:
                 last_amount = len(posts)
                 position = f"limit={limit}&page={page}"
-                posts += Api._eval_http_status(self.__session.get(f"https://e621.net/posts.json?{position}&{query}"))['posts']
+                posts += Api._eval_http_status(self.__session.get(
+                    f"{base_url}?{position}{'&' if query != '' else ''}{query}"))['posts']
                 print(f"{position}: {len(posts)}")
                 page += 1
             return [Post(post) for post in posts]
         else:
             position = f"limit={limit}&page={page}"
             return Api._eval_http_status(self.__session.get(f"https://e621.net/posts?{position}&{query}"))
+
+    def get_favorites(self, fetch_all: bool = False, page: int = 1, limit: int = 250, query: str = ""):
+        return self.get_posts(fetch_all=fetch_all, page=page, limit=limit, query=query, base_url="https://e621.net/favorites.json")
 
     def download_post(self, post: Post, quality: int=0):  # quality: 0-preview 1-sample 2-full
         url = post.file['url'] if quality == 2 else post.sample['url'] if quality == 1 else post.preview['url']
