@@ -3,6 +3,7 @@ import requests
 import base64
 from Post import Post
 from time import sleep
+from threading import Thread
 
 class Api:
     def __init__(self, credentials):
@@ -32,7 +33,7 @@ class Api:
       "525": "SSL Handshake Failed - The SSL handshake between CloudFlare and the e621 servers failed"
     }
 
-    def _eval_http_status(response, is_json: bool = True):
+    def _eval_http_status(response, is_json: bool = True, throttle: bool = True):
         if not response.ok:
             print(f"[{response.status_code}] \"{response.url}\": {Api.status_codes[f'{response.status_code}']}")
             quit()
@@ -46,18 +47,24 @@ class Api:
                   page: int = 1,
                   limit: int = 250,
                   query: str = "",
-                  base_url: str = "https://e621.net/posts.json"):
+                  base_url: str = "https://e621.net/posts.json",
+                  download: bool = False):
         if fetch_all:
+            dl_index = 0
             posts = []
             last_amount = -1
             while len(posts) != last_amount:
                 last_amount = len(posts)
                 position = f"limit={limit}&page={page}"
-                posts += Api._eval_http_status(self.__session.get(
-                    f"{base_url}?{position}{'&' if query != '' else ''}{query}"))['posts']
+                posts += [Post(post) for post in Api._eval_http_status(self.__session.get(
+                    f"{base_url}?{position}{'&' if query != '' else ''}{query}"))['posts']]
                 print(f"{position}: {len(posts)}")
+                if download:
+                    while dl_index < len(posts):
+                        self.download_post(posts[dl_index], quality=2)
+                        dl_index += 1
                 page += 1
-            return [Post(post) for post in posts]
+            return posts
         else:
             position = f"limit={limit}&page={page}"
             return Api._eval_http_status(self.__session.get(f"https://e621.net/posts?{position}&{query}"))
