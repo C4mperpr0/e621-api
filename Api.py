@@ -1,6 +1,7 @@
 import json
 import requests
 import base64
+import os
 from Post import Post
 from time import sleep
 from threading import Thread
@@ -48,6 +49,9 @@ class Api:
             print(f"[{response.status_code}] \"{response.url}\"")
             return json.loads(response.content) if is_json else response.content
 
+    def _post_filename(post: Post, quality: int):
+        return f"{post.id}_q{quality}.{post.file['ext']}"
+
     def get_posts(self,
                   fetch_all: bool = False,
                   page: int = 1,
@@ -86,8 +90,16 @@ class Api:
     def add_favorite(self, post: Post):
         Api._eval_http_status(self.__session.post("https://e621.net/favorites.json", data=f"post_id={post.id}"))
 
-    def download_post(self, post: Post, quality: int=0):  # quality: 0-preview 1-sample 2-full
+    def download_post(self, post: Post, quality: int=0, path: str="./Downloads/"):  # quality: 0-preview 1-sample 2-full
         url = post.file['url'] if quality == 2 else post.sample['url'] if quality == 1 else post.preview['url']
-        filename = f"{post.file['md5']}.{post.file['ext']}"
-        with open(f"./Downloads/{filename}", "wb+") as file:
+        with open(os.path.join(path, Api._post_filename(post, quality)), "wb+") as file:
             file.write(Api._eval_http_status(self.__session.get(url), is_json=False))
+
+    def sync_favorites(self, path: str="./Downloads/favorites/"):
+        favs = self.get_favorites(fetch_all=True)
+        for fav in favs:
+            name = Api._post_filename(fav, quality=2)
+            if not os.path.exists(os.path.join(path, name)):
+                print(f"Adding new favorite \"{name}\".")
+                self.download_post(fav, path=path, quality=2)
+
